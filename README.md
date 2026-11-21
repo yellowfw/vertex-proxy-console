@@ -1,6 +1,7 @@
 # Vertex Proxy Console
 
 在 Windows 本地运行一个 OpenAI 兼容的转发服务，把 SillyTavern 等工具的请求转发到 **Google Vertex AI**（Gemini 3 / 4）。带桌面控制台：状态、日志、Token 倒计时、用量统计、一键启停。
+------如果这个工具帮到了你，点个 ⭐ Star 支持一下，也让更多人看到。------
 
 > 适合已经拥有 Google Cloud 项目、想用 Gemini 作为酒馆主模型的用户。
 > 本项目**不提供**任何账号、额度或代理节点。
