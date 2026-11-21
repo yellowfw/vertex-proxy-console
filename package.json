@@ -1,6 +1,6 @@
 {
   "name": "vertex-proxy-console",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vertex AI 代理桌面控制台",
   "main": "main.js",
   "scripts": {
