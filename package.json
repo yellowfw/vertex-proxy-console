@@ -1,0 +1,69 @@
+{
+  "name": "vertex-proxy-console",
+  "version": "0.1.0",
+  "description": "Vertex AI 代理桌面控制台",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.dsh.vertexproxy.console",
+    "productName": "Vertex Proxy Console",
+    "directories": {
+      "output": "../daili",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "settings.html",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "proxy/vertex_proxy.js",
+        "to": "proxy/vertex_proxy.js"
+      },
+      {
+        "from": "proxy/vertex_proxy_admin.html",
+        "to": "proxy/vertex_proxy_admin.html"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "VertexProxy-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Vertex 代理控制台",
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "language": "2052",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

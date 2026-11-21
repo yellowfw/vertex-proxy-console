@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vertex 代理控制台</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#141b23; --panel2:#1a232e; --line:#26313d;
+    --text:#e6edf3; --muted:#8b98a5; --dim:#5c6b7a;
+    --ok:#3fb950; --warn:#d29922; --err:#f85149; --accent:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1100px 520px at 12% -8%,#1a2634 0%,#0b0f14 58%),var(--bg);
+    color:var(--text); min-height:100vh;
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    position:sticky; top:0; z-index:20;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:12px 20px; border-bottom:1px solid var(--line);
+    background:rgba(11,15,20,.86); backdrop-filter:blur(10px);
+  }
+  .brand{display:flex; align-items:center; gap:10px; min-width:0}
+  .brand h1{font-size:16px; margin:0; font-weight:600; letter-spacing:.3px; white-space:nowrap}
+  .ver{font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:20px; padding:1px 8px; white-space:nowrap}
+  .dot{width:10px; height:10px; border-radius:50%; background:#4a5563; flex:none; transition:background .2s}
+  .dot.ok{background:var(--ok); box-shadow:0 0 0 0 rgba(63,185,80,.6); animation:pulse 2s infinite}
+  .dot.warn{background:var(--warn); animation:pulse 2s infinite}
+  .dot.err{background:var(--err)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.55)}70%{box-shadow:0 0 0 9px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+  .head-right{margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .btn{
+    appearance:none; border:1px solid var(--line); background:var(--panel2); color:var(--text);
+    padding:6px 12px; border-radius:8px; font-size:13px; cursor:pointer; transition:.15s;
+  }
+  .btn:hover:not(:disabled){border-color:#3d4c5c; background:#22303f}
+  .btn:disabled{opacity:.45; cursor:not-allowed}
+  .btn.danger{color:#ffb3ae; border-color:#5a2a2a}
+  .btn.danger:hover:not(:disabled){background:#361d1d; border-color:#7a3333}
+  main{max-width:1480px; margin:0 auto; padding:18px 20px 40px}
+  .grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px}
+  @media (min-width:1360px){ .grid{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  @media (max-width:700px){ .grid{grid-template-columns:1fr} }
+  .card{
+    background:linear-gradient(180deg,var(--panel) 0%,#111820 100%);
+    border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0;
+  }
+  .card h2{margin:0 0 10px; font-size:12px; font-weight:600; letter-spacing:1.2px; color:var(--muted); text-transform:uppercase}
+  dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:5px 12px; font-size:13px}
+  dt{color:var(--dim); white-space:nowrap}
+  dd{margin:0; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums}
+  dd.wrap{white-space:normal; word-break:break-all; text-align:right; font-size:12px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Consolas,"Cascadia Mono",monospace}
+  .big{font-size:26px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:.5px; line-height:1.1}
+  .sub{color:var(--muted); font-size:12px; margin-top:4px}
+  .bar{height:5px; background:#1d2733; border-radius:99px; overflow:hidden; margin-top:9px}
+  .bar>i{display:block; height:100%; background:linear-gradient(90deg,#2ea043,#56d364); border-radius:99px; transition:width .4s}
+  .bar.warn>i{background:linear-gradient(90deg,#bb8009,#e3b341)}
+  .bar.err>i{background:linear-gradient(90deg,#b62324,#f85149)}
+  .pill{display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:20px; border:1px solid var(--line); color:var(--muted)}
+  .pill.ok{color:#7ee787; border-color:#2b4a2f; background:#12251a}
+  .pill.warn{color:#e3b341; border-color:#4a3c1a; background:#261f0c}
+  .pill.err{color:#ffa198; border-color:#5a2a2a; background:#2a1512}
+  .stats{display:grid; grid-template-columns:1fr 1fr; gap:8px 12px}
+  .stat{background:#0f151c; border:1px solid #1e2833; border-radius:9px; padding:8px 10px}
+  .stat b{display:block; font-size:19px; font-weight:600; font-variant-numeric:tabular-nums}
+  .stat span{font-size:11.5px; color:var(--dim)}
+  .models{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; max-height:152px; overflow:auto; margin-top:2px}
+  .chip{
+    font-family:ui-monospace,Consolas,monospace; font-size:12px; padding:3px 8px; border-radius:6px;
+    background:#0f151c; border:1px solid #1e2833; color:#c9d5e1; cursor:pointer; transition:.15s; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;
+  }
+  .chip:hover{border-color:#3d4c5c; color:#fff}
+  .chip.copied{background:#12331f; border-color:#2b6b3c; color:#7ee787}
+  .logs{margin-top:14px; padding:0; overflow:hidden}
+  .logs-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--line); background:#101720}
+  .logs-head h2{margin:0; font-size:12px; letter-spacing:1.2px; color:var(--muted); text-transform:uppercase; font-weight:600}
+  .seg{display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden}
+  .seg button{
+    appearance:none; border:0; background:transparent; color:var(--muted); font-size:12px;
+    padding:4px 10px; cursor:pointer; border-right:1px solid var(--line);
+  }
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:#22303f; color:#fff}
+  .logs-head .spacer{margin-left:auto}
+  #logbox{
+    height:44vh; min-height:260px; overflow:auto; padding:8px 0;
+    font-family:ui-monospace,SFMono-Regular,Consolas,"Cascadia Mono",monospace;
+    font-size:12.5px; line-height:1.55; background:#0a0e13;
+  }
+  .ln{display:flex; gap:10px; padding:1px 14px; white-space:pre-wrap; word-break:break-word}
+  .ln:hover{background:#101822}
+  .ln .t{color:#465667; flex:none; font-variant-numeric:tabular-nums}
+  .ln .m{min-width:0}
+  .ln.info .m{color:#aab8c6}
+  .ln.warn{background:#171308}
+  .ln.warn .m{color:#e3b341}
+  .ln.error{background:#1a0f0e}
+  .ln.error .m{color:#ff9a93}
+  .ln.hidden{display:none}
+  .empty{color:var(--dim); padding:16px 14px}
+  footer{max-width:1480px; margin:0 auto; padding:0 20px 30px; color:var(--dim); font-size:12px; line-height:1.8}
+  .kbd{font-family:ui-monospace,Consolas,monospace; background:#141b23; border:1px solid var(--line); border-radius:4px; padding:0 4px}
+  @media (max-width:640px){
+    header{padding:10px 12px} main{padding:12px 12px 32px}
+    .brand h1{font-size:15px} .ver{display:none}
+    dd{max-width:150px} .big{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="dot" id="dot" title="连接状态"></span>
+    <h1>Vertex 代理控制台</h1>
+    <span class="ver" id="ver">v—</span>
+    <button id="btnSettings" class="btn" hidden
+            style="padding:3px 12px;font-size:12px"
+            title="打开设置">设置</button>
+  </div>
+  <div class="head-right">
+    <span id="connText" class="pill">连接中…</span>
+    <button id="btnRestart" class="btn" title="退出当前进程（码 75），由启动脚本自动拉起">重启代理</button>
+    <button id="btnStop" class="btn danger" title="关闭代理进程">停止</button>
+  </div>
+</header>
+
+<main>
+  <section class="grid">
+    <div class="card">
+      <h2>服务</h2>
+      <dl>
+        <dt>监听</dt><dd class="mono" id="s-listen">—</dd>
+        <dt>PID</dt><dd class="mono" id="s-pid">—</dd>
+        <dt>运行时长</dt><dd id="s-uptime">—</dd>
+        <dt>项目</dt><dd class="mono" id="s-project">—</dd>
+        <dt>区域</dt><dd class="mono" id="s-location">—</dd>
+        <dt>上游代理</dt><dd class="mono" id="s-proxy">—</dd>
+        <dt>SA 文件</dt><dd class="wrap mono" id="s-sa">—</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h2 style="display:flex;align-items:center;justify-content:space-between;gap:8px">OAuth Token
+        <button class="btn" id="btnToken" style="padding:2px 9px;font-size:11.5px;letter-spacing:0;text-transform:none">刷新</button>
+      </h2>
+      <div class="big" id="t-left">--:--</div>
+      <div class="sub"><span class="pill" id="t-state">未知</span> <span id="t-exp">—</span></div>
+      <div class="bar" id="t-bar"><i style="width:0%"></i></div>
+      <div class="sub" style="margin-top:8px">剩余有效期，每秒刷新；低于 2 分钟自动续期</div>
+    </div>
+
+    <div class="card">
+      <h2>请求统计</h2>
+      <div class="stats">
+        <div class="stat"><b id="q-req">0</b><span>总请求</span></div>
+        <div class="stat"><b id="q-stream">0</b><span>流式请求</span></div>
+        <div class="stat"><b id="q-err">0</b><span>错误</span></div>
+        <div class="stat"><b id="q-cache">0</b><span>缓存命中</span></div>
+        <div class="stat"><b id="q-in">0</b><span>输入 tokens</span></div>
+        <div class="stat"><b id="q-out">0</b><span>输出 tokens</span></div>
+      </div>
+      <div class="sub" id="q-last" style="margin-top:9px">尚无请求</div>
+    </div>
+
+    <div class="card">
+      <h2>模型 <span class="pill" id="m-count">0</span></h2>
+      <div class="models" id="m-list"></div>
+      <div class="sub" style="margin-top:8px">点击可复制模型名；酒馆里填 <span class="mono">http://127.0.0.1:8318/v1</span></div>
+    </div>
+  </section>
+
+  <section class="card logs">
+    <div class="logs-head">
+      <h2>实时日志</h2>
+      <div class="seg" id="seg">
+        <button data-lv="all" class="on">全部</button>
+        <button data-lv="info">信息</button>
+        <button data-lv="warn">警告</button>
+        <button data-lv="error">错误</button>
+      </div>
+      <span class="pill" id="logCount">0 行</span>
+      <span class="spacer"></span>
+      <label class="sub" style="display:flex;align-items:center;gap:5px;margin:0">
+        <input type="checkbox" id="autoScroll" checked> 自动滚动
+      </label>
+      <button class="btn" id="btnClear">清屏</button>
+      <button class="btn" id="btnDownload">下载</button>
+    </div>
+    <div id="logbox"><div class="empty">等待日志…</div></div>
+  </section>
+</main>
+
+<footer>
+  <div>本页由代理进程内置提供 · <span class="kbd">/admin</span> · 管理按钮仅限本机 <span class="kbd">127.0.0.1</span> 操作</div>
+  <div id="footInfo"></div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  var status = null;
+  var connected = false;
+  var tokenAnchor = { at: 0, remain: 0 };
+  var logItems = [];
+  var lastLogId = 0;
+  var levelFilter = 'all';
+  var logBox = $('logbox');
+
+  // ---------- 格式化 ----------
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function fmtDur(sec) {
+    sec = Math.max(0, Math.floor(sec || 0));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    if (h > 0) return h + ' 时 ' + m + ' 分';
+    if (m > 0) return m + ' 分 ' + s + ' 秒';
+    return s + ' 秒';
+  }
+  function fmtNum(n) {
+    n = Number(n || 0);
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e4) return (n / 1e3).toFixed(1) + 'k';
+    return String(n);
+  }
+  function fmtTime(ts) {
+    if (!ts) return '—';
+    var d = new Date(ts);
+    return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  // ---------- 连接状态 ----------
+  function setConn(ok, text) {
+    connected = ok;
+    $('dot').className = 'dot ' + (ok ? 'ok' : 'err');
+    var p = $('connText');
+    p.className = 'pill ' + (ok ? 'ok' : 'err');
+    p.textContent = text || (ok ? '已连接' : '连接断开');
+  }
+
+  // ---------- 状态渲染 ----------
+  function render(s) {
+    status = s;
+
+    $('ver').textContent = 'v' + (s.version || '—');
+    $('s-listen').textContent = (s.host || '0.0.0.0') + ':' + s.port;
+    $('s-pid').textContent = String(s.pid);
+    $('s-uptime').textContent = fmtDur(s.uptime);
+    $('s-project').textContent = s.project || '—';
+    $('s-location').textContent = s.location || '—';
+    $('s-proxy').textContent = s.proxy || '不使用';
+    $('s-sa').textContent = s.sa || '—';
+    $('s-sa').title = s.sa || '';
+
+    var t = s.token || {};
+    tokenAnchor = { at: Date.now(), remain: t.expiresIn || 0 };
+    $('t-exp').textContent = t.expiresIn > 0 ? ('到期 ' + fmtTime(t.expAt)) : (t.valid ? '' : '当前无有效 token');
+    renderToken();
+
+    var st = s.stats || {};
+    $('q-req').textContent = fmtNum(st.requests);
+    $('q-stream').textContent = fmtNum(st.streams);
+    $('q-err').textContent = fmtNum(st.errors);
+    $('q-cache').textContent = fmtNum(st.cacheHits);
+    $('q-in').textContent = fmtNum(st.tokensIn);
+    $('q-out').textContent = fmtNum(st.tokensOut);
+    if (st.lastError) {
+      $('q-last').textContent = '最近错误 ' + fmtTime(st.lastErrorAt) + ' · ' + st.lastError;
+      $('q-last').style.color = '#ff9a93';
+    } else if (st.lastRequestAt) {
+      $('q-last').textContent = '最近请求 ' + fmtTime(st.lastRequestAt);
+      $('q-last').style.color = '';
+    }
+
+    // 模型列表只渲染一次
+    if (!s.modelsRendered && Array.isArray(s.models)) {
+      renderModels(s.models);
+      s.modelsRendered = true;
+    }
+
+    // 管理按钮权限
+    var local = !!s.local;
+    $('btnRestart').disabled = !local;
+    $('btnStop').disabled = !local;
+    $('btnRestart').title = local ? '关闭当前进程并以隐藏窗口重新拉起' : '仅限在本机 127.0.0.1 操作';
+    $('btnStop').title = local ? '关闭代理进程' : '仅限在本机 127.0.0.1 操作';
+
+    var c = s.cache || {};
+    $('footInfo').textContent =
+      '本地缓存 ' + (c.size || 0) + ' 条（' + (c.enabled ? '已启用' : '未启用') + '） · ' +
+      '日志缓冲 ' + (s.logCount || 0) + ' 条 · ' +
+      '客户端 ' + (local ? '本机' : '远程');
+  }
+
+  function renderToken() {
+    var t = tokenAnchor;
+    var left = Math.max(0, t.remain - (Date.now() - t.at) / 1000);
+    var mm = Math.floor(left / 60), ss = Math.floor(left % 60);
+    $('t-left').textContent = pad(mm) + ':' + pad(ss);
+
+    var state = $('t-state'), bar = $('t-bar'), fill = bar.firstElementChild;
+    var cls, txt, pct;
+    if (left <= 0) {
+      cls = 'err'; txt = '已过期'; pct = 0;
+    } else if (left < 120) {
+      cls = 'err'; txt = '即将过期'; pct = left / 3600 * 100;
+    } else if (left < 600) {
+      cls = 'warn'; txt = '有效'; pct = left / 3600 * 100;
+    } else {
+      cls = 'ok'; txt = '有效'; pct = left / 3600 * 100;
+    }
+    $('t-left').style.color = cls === 'ok' ? '' : (cls === 'warn' ? 'var(--warn)' : 'var(--err)');
+    state.className = 'pill ' + cls;
+    state.textContent = txt;
+    bar.className = 'bar' + (cls === 'ok' ? '' : ' ' + cls);
+    fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  }
+
+  function renderModels(models) {
+    var box = $('m-list');
+    box.textContent = '';
+    models.forEach(function (m) {
+      var b = document.createElement('button');
+      b.className = 'chip';
+      b.textContent = m;
+      b.title = '点击复制 ' + m;
+      b.onclick = function () {
+        var done = function () {
+          b.classList.add('copied');
+          var old = b.textContent;
+          b.textContent = '已复制';
+          setTimeout(function () { b.classList.remove('copied'); b.textContent = old; }, 900);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(m).then(done, function () {});
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = m; document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); done(); } catch (e) {}
+          document.body.removeChild(ta);
+        }
+      };
+      box.appendChild(b);
+    });
+    $('m-count').textContent = String(models.length);
+  }
+
+  // ---------- 日志 ----------
+  function addLog(item) {
+    if (!item || item.id <= lastLogId) return;
+    lastLogId = item.id;
+    logItems.push(item);
+    if (logItems.length > 1200) logItems.splice(0, logItems.length - 1200);
+
+    var empty = logBox.querySelector('.empty');
+    if (empty) empty.remove();
+
+    var el = document.createElement('div');
+    el.className = 'ln ' + (item.level || 'info');
+    el.dataset.lv = item.level || 'info';
+    var t = document.createElement('span');
+    t.className = 't';
+    t.textContent = fmtTime(item.t);
+    var m = document.createElement('span');
+    m.className = 'm';
+    m.textContent = item.text;
+    el.appendChild(t);
+    el.appendChild(m);
+    applyFilter(el);
+
+    var stick = $('autoScroll').checked;
+    logBox.appendChild(el);
+    while (logBox.childElementCount > 1200) logBox.removeChild(logBox.firstChild);
+    if (stick) logBox.scrollTop = logBox.scrollHeight;
+
+    $('logCount').textContent = logItems.length + ' 行';
+  }
+
+  function applyFilter(el) {
+    if (levelFilter === 'all' || el.dataset.lv === levelFilter) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  }
+
+  function refilter() {
+    var rows = logBox.children;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].classList.contains('ln')) applyFilter(rows[i]);
+    }
+  }
+
+  $('seg').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    levelFilter = btn.dataset.lv;
+    Array.prototype.forEach.call($('seg').children, function (b) {
+      b.classList.toggle('on', b === btn);
+    });
+    refilter();
+  });
+
+  $('btnClear').onclick = function () {
+    logBox.textContent = '';
+    var e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = '已清屏（服务器缓冲保留，刷新页面可见）';
+    logBox.appendChild(e);
+  };
+
+  $('btnDownload').onclick = function () {
+    var lines = logItems.map(function (i) {
+      return new Date(i.t).toLocaleString('zh-CN') + ' [' + i.level + '] ' + i.text;
+    });
+    var blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'vertex-proxy-log-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  };
+
+  // ---------- 操作 ----------
+  function act(name, label) {
+    var extra = name === 'restart'
+      ? '\n\n重启会让当前进程退出（码 75），由启动脚本 start_vertex.bat 自动拉起；\n若代理是手动 node 启动的，需要自己重新运行。'
+      : '\n\n停止后需要重新双击启动脚本才能恢复。';
+    if (!confirm('确定要' + label + '吗？' + extra)) return;
+    fetch('/api/' + name, { method: 'POST' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (j && j.error) alert('操作失败：' + j.error);
+      })
+      .catch(function () {});
+  }
+  $('btnRestart').onclick = function () { act('restart', '重启代理'); };
+  $('btnStop').onclick = function () { act('stop', '停止代理'); };
+
+  // 桌面版（Electron）里 preload 会注入 window.vx，显示设置入口；浏览器打开时自动隐藏
+  if (window.vx && typeof window.vx.openSettings === 'function') {
+    var sb = $('btnSettings');
+    sb.hidden = false;
+    sb.onclick = function () { window.vx.openSettings(); };
+  }
+
+  $('btnToken').onclick = function () {
+    var b = $('btnToken');
+    b.disabled = true; b.textContent = '刷新中';
+    fetch('/api/token/refresh', { method: 'POST' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        b.disabled = false; b.textContent = '刷新';
+        if (!j.ok) alert('刷新失败：' + (j.error || '未知错误'));
+        poll();
+      })
+      .catch(function () { b.disabled = false; b.textContent = '刷新'; });
+  };
+
+  // ---------- 轮询 ----------
+  function poll() {
+    fetch('/api/status', { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (s) {
+        render(s);
+        setConn(true, '已连接');
+      })
+      .catch(function () {
+        setConn(false, '连接断开，等待恢复…');
+      });
+  }
+  poll();
+  setInterval(poll, 2000);
+  setInterval(renderToken, 250);
+  setInterval(function () {
+    if (status && status.startedAt) {
+      var up = Math.floor((Date.now() - status.startedAt) / 1000);
+      $('s-uptime').textContent = fmtDur(up);
+    }
+  }, 1000);
+
+  // ---------- 实时日志 ----------
+  function connectLogs() {
+    var es = new EventSource('/api/logs');
+    es.onmessage = function (e) {
+      try { addLog(JSON.parse(e.data)); } catch (err) {}
+    };
+    es.onerror = function () {
+      // EventSource 会自动重连，这里只提示
+      if (connected) setConn(false, '日志流断开，重连中…');
+      setTimeout(function () { if (connected) setConn(true, '已连接'); }, 1500);
+    };
+  }
+  connectLogs();
+
+  // 键盘：r 重启、s 停止（需本机）
+  document.addEventListener('keydown', function (e) {
+    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.key === 'r' && !e.ctrlKey && !e.metaKey) { if (!$('btnRestart').disabled) act('restart', '重启代理'); }
+    if (e.key === 's' && !e.ctrlKey && !e.metaKey) { if (!$('btnStop').disabled) act('stop', '停止代理'); }
+  });
+})();
+</script>
+</body>
+</html>

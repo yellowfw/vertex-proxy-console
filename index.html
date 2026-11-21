@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+  <title>Vertex 代理</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#141b23; --line:#26313d; --text:#e6edf3;
+      --muted:#8b98a5; --dim:#5c6b7a; --ok:#3fb950; --warn:#d29922; --err:#f85149; --accent:#58a6ff;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{
+      background:radial-gradient(900px 420px at 50% -10%,#1a2634 0%,#0b0f14 60%),var(--bg);
+      color:var(--text); display:flex; align-items:center; justify-content:center;
+      font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased; overflow:hidden;
+    }
+    .wrap{width:min(780px,92vw); max-height:94vh; display:flex; flex-direction:column; align-items:center; padding:24px 0}
+    .logo img{width:76px;height:76px;display:block;filter:drop-shadow(0 6px 22px rgba(63,185,80,.18))}
+    h1{font-size:21px; margin:14px 0 2px; font-weight:600; letter-spacing:.5px}
+    .sub{color:var(--dim); font-size:12.5px; margin:0 0 8px}
+    .cfg{color:#4d5c6b; font-size:11.5px; margin:0 0 16px; font-family:ui-monospace,Consolas,monospace; text-align:center; word-break:break-all; max-width:640px}
+    .status{display:flex; align-items:center; gap:10px; font-size:15px}
+    .dot{width:10px;height:10px;border-radius:50%;background:#4a5563;flex:none;transition:background .2s}
+    .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:pulse 2s infinite}
+    .dot.warn{background:var(--warn);animation:pulse 2s infinite}
+    .dot.err{background:var(--err)}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.55)}70%{box-shadow:0 0 0 9px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+    .detail{color:var(--muted); font-size:12.5px; margin-top:6px; min-height:18px; text-align:center}
+    .actions{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:18px 0 10px}
+    .btn{
+      appearance:none; border:1px solid var(--line); background:#1a232e; color:var(--text);
+      padding:7px 14px; border-radius:8px; font-size:13px; cursor:pointer; transition:.15s;
+    }
+    .btn:hover:not(:disabled){border-color:#3d4c5c;background:#22303f}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .btn.primary{background:#12331f;border-color:#2b6b3c;color:#7ee787}
+    .btn.primary:hover:not(:disabled){background:#17422a}
+    .btn.ghost{background:transparent;color:var(--muted)}
+    .hint{color:var(--dim); font-size:12px; text-align:center; max-width:560px; margin-bottom:14px; line-height:1.7}
+    .hint.alert{color:#ffa198}
+    .logbox{
+      width:100%; height:170px; overflow:auto; background:#080c10; border:1px solid #1b242e; border-radius:10px;
+      padding:8px 0; font-family:ui-monospace,Consolas,"Cascadia Mono",monospace; font-size:12px; line-height:1.6;
+    }
+    .ln{padding:0 12px; white-space:pre-wrap; word-break:break-word; color:#8fa3b6}
+    .ln.warn{color:#e3b341}
+    .ln.error{color:#ff9a93;background:#1a0f0e}
+    .empty{color:var(--dim);padding:10px 12px}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="logo"><img src="assets/icon.png" alt="" /></div>
+    <h1>Vertex 代理控制台</h1>
+    <p class="sub">本地转发 Gemini 3 / 4 · 默认端口 8318</p>
+    <div class="cfg" id="cfg"></div>
+
+    <div class="status">
+      <span class="dot" id="dot"></span>
+      <span id="msg">正在检查代理状态…</span>
+    </div>
+    <div class="detail" id="detail"></div>
+
+    <div class="actions">
+      <button id="pickSa" class="btn primary" hidden>打开设置…</button>
+      <button id="retry" class="btn">重新启动</button>
+      <button id="open" class="btn ghost">浏览器打开</button>
+      <button id="quit" class="btn ghost">退出</button>
+    </div>
+
+    <div class="hint" id="hint">
+      首次使用需要选择 Google 服务账户 JSON（仅在本机读取，不会上传或打包）
+    </div>
+
+    <div class="logbox" id="logbox"><div class="empty">等待启动日志…</div></div>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var $ = function (id) { return document.getElementById(id); };
+      var hasLog = false;
+
+      function setState(s) {
+        var cls = s.phase === 'ready' ? 'ok' : (s.phase === 'error' || s.phase === 'stopped') ? 'err' : 'warn';
+        $('dot').className = 'dot ' + cls;
+        $('msg').textContent = s.message || '';
+        $('detail').textContent = s.detail || '';
+        $('pickSa').hidden = !s.needConfig;
+        $('retry').disabled = s.phase === 'starting';
+        $('retry').textContent = s.needConfig ? '重新检测' : '重新启动';
+        if (s.needConfig) {
+          $('hint').className = 'hint alert';
+          $('hint').textContent = '还没有可用的服务账户：点「选择 SA 文件」，选择后会自动保存并启动';
+        }
+      }
+
+      function addLog(line) {
+        if (!hasLog) { $('logbox').textContent = ''; hasLog = true; }
+        var d = document.createElement('div');
+        d.className = 'ln' + (/^\[\w+\]\s*(err|fatal)/i.test(line) ? ' error' : (/\bwarn\b|\[warn\]/i.test(line) ? ' warn' : ''));
+        d.textContent = line;
+        var box = $('logbox');
+        box.appendChild(d);
+        while (box.childElementCount > 400) box.removeChild(box.firstChild);
+        box.scrollTop = box.scrollHeight;
+      }
+
+      function shortName(p) {
+        if (!p) return '';
+        var parts = String(p).split(/[\\/]/);
+        return parts[parts.length - 1] || p;
+      }
+
+      window.vx.hello().then(function (data) {
+        setState(data.state);
+        (data.log || []).forEach(addLog);
+        var c = data.config || {};
+        var bits = [];
+        if (c.port) bits.push('端口 ' + c.port);
+        if (c.proxyScript) bits.push('脚本 ' + shortName(c.proxyScript));
+        if (c.saPath) bits.push('SA ' + shortName(c.saPath));
+        $('cfg').textContent = bits.join('  ·  ');
+        if (!c.saPath) $('cfg').textContent = bits.concat('SA 未配置').join('  ·  ');
+      });
+
+      window.vx.onState(setState);
+      window.vx.onLog(addLog);
+
+      $('retry').onclick = function () { window.vx.retry(); };
+      $('quit').onclick = function () { window.vx.quit(); };
+      $('open').onclick = function () { window.vx.openAdmin(); };
+      $('pickSa').onclick = function () { window.vx.openSettings(); };
+    })();
+  </script>
+</body>
+</html>
