@@ -29,7 +29,7 @@
 ### 方式二：从源码运行
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/yellowfw/vertex-proxy-console.git
 cd vertex-proxy-console
 npm install
 npm start
