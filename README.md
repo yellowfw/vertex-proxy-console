@@ -83,7 +83,7 @@ npm install
 npm run dist
 ```
 
-产物输出到 `../daili`（可在 `package.json` 的 `build.directories.output` 修改）。
+产物输出到 `dist/`（可在 `package.json` 的 `build.directories.output` 修改）。
 安装器为 NSIS，未签名。
 
 ## 项目结构

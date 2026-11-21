@@ -19,7 +19,7 @@
     "appId": "com.dsh.vertexproxy.console",
     "productName": "Vertex Proxy Console",
     "directories": {
-      "output": "../daili",
+      "output": "dist",
       "buildResources": "assets"
     },
     "files": [
