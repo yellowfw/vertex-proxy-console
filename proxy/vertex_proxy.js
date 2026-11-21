@@ -523,7 +523,7 @@ function handleAdmin(req, res, urlObj) {
     const ping = setInterval(() => {
       try { res.write(': ping\n\n'); } catch { clearInterval(ping); logClients.delete(res); }
     }, 15000);
-    req.on('close', () => { clearInterval(ping); logClients.delete(res); });
+    res.on('close', () => { clearInterval(ping); logClients.delete(res); });
     return true;
   }
 
